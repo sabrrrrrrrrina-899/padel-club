@@ -76,7 +76,7 @@ async function authChanged(){
  if(user&&!allowed)cloudMsg('邮箱验证成功，但此账号还未被添加到 Supabase 管理员表。');
  render();
 }
-$('sendOtp').addEventListener('click',async()=>{const email=$('adminEmail').value.trim();if(!cloud)return notify('请先等待云端连接');if(!/^\S+@\S+\.\S+$/.test(email))return notify('请输入有效的邮箱');const {error}=await cloud.auth.signInWithOtp({email,options:{shouldCreateUser:true}});notify(error?error.message:'验证码已发送，请查看邮箱（若邮件提供的是链接，也可点击链接登录）')});
+$('sendOtp').addEventListener('click',async()=>{const email=$('adminEmail').value.trim();if(!cloud)return notify('请先等待云端连接');if(!/^\S+@\S+\.\S+$/.test(email))return notify('请输入有效的邮箱');const {error}=await cloud.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:'https://sabrrrrrrrrina-899.github.io/padel-club/'}});notify(error?error.message:'验证码已发送，请查看邮箱（若邮件提供的是链接，也可点击链接登录）')});
 $('verifyOtp').addEventListener('click',async()=>{const email=$('adminEmail').value.trim(),token=$('adminCode').value.trim();if(!cloud)return notify('请先等待云端连接');if(!email||!token)return notify('请填写邮箱和验证码');const {error}=await cloud.auth.verifyOtp({email,token,type:'email'});if(error)return notify(error.message);await authChanged();if(isAdmin)await readCloud();notify(isAdmin?'管理员验证成功':'邮箱已验证，等待管理员授权')});
 $('logout').addEventListener('click',async()=>{if(cloud)await cloud.auth.signOut();await authChanged();await readCloud();notify('已退出登录')});
 (async function connect(){
