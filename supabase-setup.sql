@@ -20,9 +20,13 @@ drop policy if exists "admin state update" on public.padel_club_state;
 create policy "admin state update" on public.padel_club_state for update to authenticated using
 (id='main' and exists(select 1 from public.padel_admins where user_id=auth.uid()))
 with check (id='main' and exists(select 1 from public.padel_admins where user_id=auth.uid()));
-grant select on public.padel_club_state to anon,authenticated;
-grant insert,update on public.padel_club_state to authenticated;
+revoke all on public.padel_admins from anon;
+revoke insert,update,delete,truncate,references,trigger on public.padel_admins from authenticated;
 grant select on public.padel_admins to authenticated;
+revoke insert,update,delete,truncate,references,trigger on public.padel_club_state from anon;
+grant select on public.padel_club_state to anon;
+revoke delete,truncate,references,trigger on public.padel_club_state from authenticated;
+grant select,insert,update on public.padel_club_state to authenticated;
 alter publication supabase_realtime add table public.padel_club_state;
 -- After administrator signs in for first time, run ONCE replacing email:
 -- insert into public.padel_admins(user_id)
