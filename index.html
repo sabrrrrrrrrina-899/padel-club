@@ -6,7 +6,7 @@
 <section id="live" class="view"><div class="headline"><div><h1>比赛中心</h1><div class="muted" id="eventSubtitle">录入比分，积分自动更新。</div></div><button class="btn ghost" data-goto="create" data-admin-only hidden>新开比赛</button></div><div id="liveContent"></div></section>
 <section id="ratings" class="view"><div class="headline"><div><h1>球员评级</h1><div class="muted">PCR为平台内部试验性评级，独立于赛事让分。</div></div></div><div class="card"><h2>实力榜 · PCR</h2><div class="tablewrap"><table><thead><tr><th>球员</th><th>性别</th><th>当前PCR</th><th>较初始变化</th><th>已评分场次</th><th>评级状态</th></tr></thead><tbody id="ratingsBody"></tbody></table></div></div><div class="card"><h2>评级计算说明</h2><p class="mini muted">依据双方原始回合得分率与赛前实力预测的差值调整评级，考虑对手与搭档，绝不使用混双让分；新选手变化相对较快，已有较多比赛的选手变化较慢。评级为实验性内部数值，并非官方等级。每次修改比分时重新从原始赛事记录依次计算。</p></div></section>
 <section id="history" class="view"><div class="headline"><div><h1>历史赛事</h1><div class="muted">保留每场比赛的真实比分和赛事规则。</div></div></div><div class="card" id="historyContent"></div></section>
-<section id="settings" class="view"><div class="headline"><div><h1>设置与登录</h1><div class="muted">球友无需登录即可查看公开赛事。</div></div></div><div class="card"><h2 id="authStatus">当前身份：游客</h2><p class="mini muted">你可以查看赛程、比分、积分排行榜和PCR评级。为保障比赛数据，访客不能创建赛事、添加球员或修改比分。</p><div class="card" style="background:#f7faf7;margin-bottom:0"><strong>管理员邮箱验证码登录（6位数字）</strong><p class="mini muted" id="cloudStatus">正在连接云端…</p><div class="field"><label for="adminEmail">管理员邮箱</label><input id="adminEmail" type="email" autocomplete="email" placeholder="输入管理员邮箱"></div><button class="btn secondary" id="sendOtp" type="button">发送邮箱验证码</button><div class="field"><label for="adminCode">6位邮箱验证码</label><input id="adminCode" inputmode="numeric" autocomplete="one-time-code" placeholder="输入邮件中的6位数字" maxlength="6" pattern="[0-9]{6}"></div><div class="row"><button class="btn" id="verifyOtp" type="button">验证并登录</button><button class="btn ghost" id="logout" type="button" hidden>退出登录</button></div><p class="mini muted">只有在数据库管理员名单中的邮箱能获得编辑权限。管理员名单需在Supabase中配置。</p></div></div></section><div class="toast" id="toast" role="status"></div><footer class="footer">Padel Club · 已预置2026年10月9日7场历史比赛。公开只读预览。比赛数据目前是网页预置历史记录或当前浏览器缓存，尚未实现云端实时同步和管理员邮箱认证。</footer></main>
+<section id="settings" class="view"><div class="headline"><div><h1>设置与登录</h1><div class="muted">球友无需登录即可查看公开赛事。</div></div></div><div class="card"><h2 id="authStatus">当前身份：游客</h2><p class="mini muted">你可以查看赛程、比分、积分排行榜和PCR评级。为保障比赛数据，访客不能创建赛事、添加球员或修改比分。</p><div class="card" style="background:#f7faf7;margin-bottom:0"><strong>管理员登录</strong><p class="mini muted" id="cloudStatus">正在连接云端…</p><div id="loginFields"><div class="field"><label for="adminUsername">用户名</label><input id="adminUsername" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="输入用户名"></div><div class="field"><label for="adminPassword">密码</label><input id="adminPassword" type="password" autocomplete="current-password" placeholder="输入密码"></div><button class="btn" id="login" type="button">登录</button></div><button class="btn ghost" id="logout" type="button" hidden>退出登录</button><p class="mini muted">管理员账号由系统预先配置，其他球友无需注册即可查看公开数据。</p></div></div></section><div class="toast" id="toast" role="status"></div><footer class="footer">Padel Club · 公开数据由 Supabase 云端实时同步。管理员登录后可维护赛事、比分和球员资料。</footer></main>
 <script>
 (()=>{'use strict';const KEY='padel-club-prototype-v1';const sample=[['Chris','M',2.8],['Henry','M',2.8],['骏康','M',2.8],['阿铮','M',2.8],['小苟','M',2.6],['Tang','F',2.5],['Johnny','M',2.3]];const initial=()=>({players:sample.map((p,i)=>({id:'p'+i,name:p[0],gender:p[1],initial:p[2]})),events:[],activeId:null,selected:sample.map((p,i)=>'p'+i)});let state;try{state=JSON.parse(localStorage.getItem(KEY))||initial()}catch{state=initial()}// Built-in historical seed: 2026-10-09, user-confirmed seven rounds.
 // Imported once; never replaces any current events or scores.
@@ -52,6 +52,8 @@ function historyUI(){$('historyContent').innerHTML=state.events.length?state.eve
 function render(){document.querySelectorAll("[data-admin-only]").forEach(el=>{el.hidden=!isAdmin;el.style.display=isAdmin?"":"none"});stats();homeRank();homeNet();playerUI();if($('live').classList.contains('active'))liveUI();if($('ratings').classList.contains('active'))ratingUI();if($('history').classList.contains('active'))historyUI()};render();
 const API='https://hmumltbmetqdrverzjim.supabase.co';
 const PUBLIC_KEY='sb_publishable_AqD0t-DOlADlrfEKM6nvSw_6vT44QgO';
+const ADMIN_USERNAME='tang';
+const ADMIN_EMAIL='sabrrrrrrrrina@gmail.com';
 const cloudMsg=msg=>{$('cloudStatus').textContent=msg};
 async function readCloud(){
  if(!cloud)return;
@@ -67,29 +69,45 @@ async function writeCloud(){
  const {error}=await cloud.from('padel_club_state').upsert({id:'main',data:snapshot,updated_at:new Date().toISOString()},{onConflict:'id'});
  if(error){cloudMsg('保存云端失败：'+error.message);notify('云端保存失败，请检查管理员权限')} else if(myRev===revision)cloudMsg('云端已同步 · 所有球友可实时查看');
 }
-async function authChanged(){
+async function authChanged(user){
  if(!cloud)return;
- const {data:{user},error:userError}=await cloud.auth.getUser();if(userError)console.warn('Authentication check:',userError.message);
+ if(user===undefined){const {data,error}=await cloud.auth.getUser();if(error&&error.name!=='AuthSessionMissingError')console.warn('Authentication check:',error.message);user=data&&data.user}
  let allowed=false;
  if(user){const {data,error}=await cloud.from('padel_admins').select('user_id').eq('user_id',user.id).maybeSingle();allowed=!error&&!!data}
  isAdmin=allowed;
- $('authStatus').textContent=allowed?'当前身份：管理员':user?'已登录，但尚无管理员权限':'当前身份：游客';
+ $('authStatus').textContent=allowed?'当前身份：管理员 tang':user?'已登录，但尚无管理员权限':'当前身份：游客';
  $('clubPill').textContent=allowed?'管理员 · 可编辑':'游客 · 只读';
+ $('loginFields').hidden=!!user;
  $('logout').hidden=!user;
- if(user&&!allowed)cloudMsg('邮箱已验证，但账号尚未取得管理员授权。');
+ if(user&&!allowed)cloudMsg('该账号没有管理员权限。');
  render();
 }
-$('sendOtp').addEventListener('click',async()=>{const email=$('adminEmail').value.trim();if(!cloud)return notify('请先等待云端连接');if(!/^\S+@\S+\.\S+$/.test(email))return notify('请输入有效的邮箱');const {error}=await cloud.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:'https://sabrrrrrrrrina-899.github.io/padel-club/'}});notify(error?error.message:'验证邮件已发送，请复制邮件中的6位验证码并返回本页输入')});
-$('verifyOtp').addEventListener('click',async()=>{const email=$('adminEmail').value.trim(),token=$('adminCode').value.trim();if(!cloud)return notify('请先等待云端连接');if(!email||!/^\d{6}$/.test(token))return notify('请输入邮件中的6位数字验证码');const {error}=await cloud.auth.verifyOtp({email,token,type:'email'});if(error)return notify(error.message);await authChanged();if(isAdmin)await readCloud();notify(isAdmin?'管理员验证成功':'邮箱已验证，等待管理员授权')});
-$('logout').addEventListener('click',async()=>{if(cloud)await cloud.auth.signOut();await authChanged();await readCloud();notify('已退出登录')});
+async function login(){
+ const username=$('adminUsername').value.trim().toLowerCase(),password=$('adminPassword').value;
+ if(!cloudReady||!cloud)return notify('请先等待云端连接');
+ if(username!==ADMIN_USERNAME||!password)return notify('用户名或密码错误');
+ const button=$('login');button.disabled=true;cloudMsg('正在验证管理员身份…');
+ try{
+  const {data,error}=await cloud.auth.signInWithPassword({email:ADMIN_EMAIL,password});
+  $('adminPassword').value='';
+  if(error||!data.user){cloudMsg('云端已连接 · 游客只读');return notify('用户名或密码错误')}
+  await authChanged(data.user);
+  if(!isAdmin){await cloud.auth.signOut({scope:'local'});await authChanged(null);return notify('该账号没有管理员权限')}
+  await readCloud();notify('管理员登录成功');
+ }finally{button.disabled=false}
+}
+$('login').addEventListener('click',login);
+$('adminPassword').addEventListener('keydown',event=>{if(event.key==='Enter')login()});
+$('logout').addEventListener('click',async()=>{if(cloud)await cloud.auth.signOut({scope:'local'});await authChanged(null);await readCloud();notify('已退出登录')});
 (async function connect(){
  try{
  const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
- cloud=mod.createClient(API,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+ cloud=mod.createClient(API,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
  cloudReady=true;
- await authChanged();await readCloud();
+ const {data:{session}}=await cloud.auth.getSession();
+ await authChanged(session&&session.user);await readCloud();
  cloud.channel('padel-public-scoreboard').on('postgres_changes',{event:'*',schema:'public',table:'padel_club_state',filter:'id=eq.main'},async()=>{if(!remoteBusy)await readCloud()}).subscribe();
- cloud.auth.onAuthStateChange(()=>{setTimeout(()=>authChanged(),0)});
+ cloud.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>authChanged(session&&session.user),0)});
  }catch(e){cloudMsg('云端连接暂不可用，当前仅展示预置历史记录：'+e.message)}
 })();})();
 </script></body></html>
