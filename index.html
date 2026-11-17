@@ -90,7 +90,7 @@ function calcRatings(){
   return r;
 }
 function leaderboard(e){let rows=Object.fromEntries(e.ids.map(id=>[id,{id,played:0,raw:0,bonus:0,total:0}]));for(let m of e.matches)if(scoreComplete(m)){for(let [team,score]of[[m.a,m.scoreA],[m.b,m.scoreB]]){let bonus=handicapFor(e,m,team);for(let id of team){rows[id].played++;rows[id].raw+=score;rows[id].bonus+=bonus;rows[id].total+=score+(e.scoreMode==='with'?bonus:0)}}}return Object.values(rows).sort((a,b)=>b.total-a.total||b.raw-a.raw||pby(a.id).name.localeCompare(pby(b.id).name))}
-let scheduleEditing=false,scheduleDraft=[];
+let scheduleEditing=false,scheduleDraft=[],editingScoreKeys=new Set();
 function scheduleEditorHtml(e){
   const ids=e.ids,currentRatings=calcRatings();
   const counts=Object.fromEntries(ids.map(id=>[id,0]));
@@ -208,13 +208,14 @@ function liveUI(){
   e.matches.forEach((m,matchIndex)=>{
     const rest=e.ids.filter(id=>![...m.a,...m.b].includes(id)).map(id=>pby(id).name);
     const ba=handicapFor(e,m,m.a),bb=handicapFor(e,m,m.b);
+    const scoreKey=e.id+':'+String(m.id),editingScore=editingScoreKeys.has(scoreKey),scoreLocked=scoreComplete(m)&&!editingScore;
     const scoreInputs=fixed
-      ?`<input class="scoreA" ${isAdmin?'':'disabled'} type="number" inputmode="numeric" min="0" max="${e.balls}" aria-label="第${matchIndex+1}场A组得分" value="${m.scoreA===null?'':m.scoreA}" placeholder="A"><span>:</span><span class="autoB" style="font-size:23px;font-weight:750;min-width:32px">${m.scoreB===null?'—':m.scoreB}</span>`
-      :`<input class="scoreA" ${isAdmin?'':'disabled'} type="number" inputmode="numeric" min="0" aria-label="第${matchIndex+1}场A组得分" value="${m.scoreA===null?'':m.scoreA}" placeholder="A"><span>:</span><input class="scoreB" ${isAdmin?'':'disabled'} type="number" inputmode="numeric" min="0" aria-label="第${matchIndex+1}场B组得分" value="${m.scoreB===null?'':m.scoreB}" placeholder="B">`;
+      ?`<input class="scoreA" ${!isAdmin||scoreLocked?'disabled':''} type="number" inputmode="numeric" min="0" max="${e.balls}" aria-label="第${matchIndex+1}场A组得分" value="${m.scoreA===null?'':m.scoreA}" placeholder="A"><span>:</span><span class="autoB" style="font-size:23px;font-weight:750;min-width:32px">${m.scoreB===null?'—':m.scoreB}</span>`
+      :`<input class="scoreA" ${!isAdmin||scoreLocked?'disabled':''} type="number" inputmode="numeric" min="0" aria-label="第${matchIndex+1}场A组得分" value="${m.scoreA===null?'':m.scoreA}" placeholder="A"><span>:</span><input class="scoreB" ${!isAdmin||scoreLocked?'disabled':''} type="number" inputmode="numeric" min="0" aria-label="第${matchIndex+1}场B组得分" value="${m.scoreB===null?'':m.scoreB}" placeholder="B">`;
     html+=`<div style="border-top:1px solid #edf0ed;padding:17px 0" data-match="${esc(m.id)}">
       <div class="row between" style="margin-bottom:9px"><strong class="mini">第 ${matchIndex+1} 场</strong><span class="note">${scoreComplete(m)?'✓ 已记录':'待录入'}${ba||bb?` · 混双${ba?'+':'对手+'}${ba||bb}`:''}</span></div>
       <div class="match"><div class="team">${m.a.map(id=>esc(pby(id).name)).join('<br>')}</div><div class="score">${scoreInputs}</div><div class="team">${m.b.map(id=>esc(pby(id).name)).join('<br>')}</div></div>
-      <div class="row between"><span class="note">休息：${rest.map(esc).join('、')||'无'}</span>${isAdmin?'<button class="btn secondary saveScore" type="button">保存比分</button>':'<span class="pill">只读</span>'}</div>
+      <div class="row between"><span class="note">休息：${rest.map(esc).join('、')||'无'}</span>${!isAdmin?'<span class="pill">只读</span>':scoreLocked?'<button class="btn secondary editScore" type="button">编辑比分</button>':`<div class="editorActions"><button class="btn secondary saveScore" type="button">${editingScore?'保存修改':'保存比分'}</button>${editingScore?'<button class="btn ghost cancelScoreEdit" type="button">取消编辑</button>':''}</div>`}</div>
       ${scoreComplete(m)?`<div class="note" style="margin-top:6px">计入积分：A ${m.scoreA+ba} / B ${m.scoreB+bb}</div>`:''}
     </div>`;
   });
@@ -240,15 +241,22 @@ function liveUI(){
       box.querySelector('.autoB').textContent=Number.isInteger(val)&&val>=0&&val<=e.balls?e.balls-val:'—';
     });
     if(!isAdmin)return;
-    box.querySelector('.saveScore').addEventListener('click',()=>{
+    const editKey=e.id+':'+box.dataset.match;
+    const editButton=box.querySelector('.editScore');
+    if(editButton){editButton.addEventListener('click',()=>{if(!requireOnlineAdmin())return;editingScoreKeys.add(editKey);render()});return}
+    const cancelButton=box.querySelector('.cancelScoreEdit');
+    if(cancelButton)cancelButton.addEventListener('click',()=>{editingScoreKeys.delete(editKey);render()});
+    const saveButton=box.querySelector('.saveScore');
+    if(!saveButton)return;
+    saveButton.addEventListener('click',()=>{
       if(!requireOnlineAdmin())return;
       const a=Number(inputA.value),b=fixed?e.balls-a:Number(inputB.value);
       const invalid=inputA.value.trim()===''||!Number.isInteger(a)||a<0||(fixed&&a>e.balls)||(!fixed&&(inputB.value.trim()===''||!Number.isInteger(b)||b<0||a+b===0));
       if(invalid){notify(fixed?`请输入0到${e.balls}之间的整数（A组实际得分）`:'请分别输入A、B组非负整数比分，且总分须大于0');return}
       const match=e.matches.find(m=>String(m.id)===box.dataset.match);
       if(!match)return notify('未找到对应比赛，请刷新后重试');
-      match.scoreA=a;match.scoreB=b;
-      save();render();notify('比分已保存，积分与评级已更新');
+      match.scoreA=a;match.scoreB=b;editingScoreKeys.delete(editKey);
+      save();render();notify('比分已自动保存并重新锁定，积分与评级已更新');
     });
   });
 }
@@ -351,7 +359,7 @@ async function authChanged(user){
  if(user===undefined){const {data,error}=await cloud.auth.getUser();if(error&&error.name!=='AuthSessionMissingError')console.warn('Authentication check:',error.message);user=data&&data.user}
  let allowed=false;
  if(user){const {data,error}=await cloud.from('padel_admins').select('user_id').eq('user_id',user.id).maybeSingle();allowed=!error&&!!data}
- isAdmin=allowed;
+ isAdmin=allowed;if(!isAdmin)editingScoreKeys.clear();
  $('authStatus').textContent=allowed?'当前身份：管理员 tang':user?'已登录，但尚无管理员权限':'当前身份：游客';
  $('clubPill').textContent=allowed?'管理员 · 可编辑':'游客 · 只读';
  $('loginFields').hidden=!!user;
