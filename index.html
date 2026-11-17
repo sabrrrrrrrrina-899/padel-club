@@ -193,7 +193,7 @@ function liveUI(){
     <div class="card metric"><span class="muted mini">计分方式</span><strong style="font-size:20px">${fixed?e.balls+'球':'自由比分'}</strong></div>
   </div>`;
   if(isAdmin)html+=`<div class="card">
-    <div class="row between"><h2 style="margin:0">赛事设置</h2><div class="editorActions"><button class="btn secondary" id="startScheduleEdit" type="button">${scheduleEditing?'正在编辑赛程':'编辑赛程'}</button><button class="btn secondary" id="saveEventSettings" type="button">保存设置</button></div></div>
+    <div class="row between"><h2 style="margin:0">赛事设置</h2><div class="editorActions"><button class="btn secondary" id="startScheduleEdit" type="button">${scheduleEditing?'正在编辑赛程':'编辑赛程'}</button><button class="btn secondary" id="saveEventSettings" type="button">保存设置</button>${e.id===HIST_ID?'<span class="pill">预置历史赛事</span>':'<button class="btn danger" id="deleteEvent" type="button">删除赛事</button>'}</div></div>
     <div class="formgrid" style="margin-top:14px">
       <div class="field"><label>赛事名称</label><input id="editEventName" value="${esc(e.name)}" maxlength="60"></div>
       <div class="field"><label>场地使用时长</label><select id="editEventMinutes">${[60,90,120,180].map(v=>`<option value="${v}" ${e.minutes===v?'selected':''}>${v}分钟</option>`).join('')}</select></div>
@@ -230,6 +230,8 @@ function liveUI(){
     e.name=name;e.minutes=Number($('editEventMinutes').value);e.courts=Number($('editEventCourts').value);e.handicap=Number($('editEventHandicap').value);e.scoreMode=$('editEventScoreMode').value;
     save();render();notify('赛事设置已保存');
   });
+  const deleteButton=$('deleteEvent');
+  if(deleteButton)deleteButton.addEventListener('click',()=>{if(deleteEventById(e.id))nav('history')});
   bindScheduleEditor(e);
   $('liveContent').querySelectorAll('[data-match]').forEach(box=>{
     const inputA=box.querySelector('.scoreA'),inputB=box.querySelector('.scoreB');
@@ -284,7 +286,28 @@ function ratingUI(){
   select.addEventListener('change',()=>{selectedTrendPlayerId=select.value;ratingUI()});
   if(isAdmin)playerAdminUI();
 }
-function historyUI(){$('historyContent').innerHTML=state.events.length?state.events.slice().reverse().map(e=>`<div class="historyitem"><div><strong>${esc(e.name)}</strong><div class="note">${formatDate(e.created)} · ${e.ids.length}人 · ${e.matches.filter(scoreComplete).length}/${e.matches.length}场 · ${eventScoreLabel(e)}</div></div><button class="btn secondary" data-open="${e.id}">查看</button></div>`).join(''):'<div class="empty">还没有历史比赛</div>';$('historyContent').querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{state.activeId=b.dataset.open;save();nav('live')}))}
+function deleteEventById(id){
+  if(!requireOnlineAdmin())return false;
+  if(id===HIST_ID){notify('预置历史赛事受保护，不能删除');return false}
+  const event=state.events.find(e=>e.id===id);
+  if(!event){notify('未找到该赛事，请刷新后重试');return false}
+  const scored=event.matches.filter(scoreComplete).length;
+  if(!confirm(`确定删除赛事“${event.name}”吗？该赛事共有${event.matches.length}局，其中${scored}局已录入比分。`))return false;
+  if(!confirm(`再次确认：删除“${event.name}”后，其赛程、比分和排行榜数据将被永久移除。`))return false;
+  state.events=state.events.filter(e=>e.id!==id);
+  if(state.activeId===id){
+    const remaining=state.events.slice().sort((a,b)=>a.created.localeCompare(b.created));
+    state.activeId=remaining.length?remaining[remaining.length-1].id:null;
+  }
+  scheduleEditing=false;scheduleDraft=[];
+  save();render();notify('赛事已删除');
+  return true;
+}
+function historyUI(){
+  $('historyContent').innerHTML=state.events.length?state.events.slice().reverse().map(e=>`<div class="historyitem"><div><strong>${esc(e.name)}</strong><div class="note">${formatDate(e.created)} · ${e.ids.length}人 · ${e.matches.filter(scoreComplete).length}/${e.matches.length}场 · ${eventScoreLabel(e)}</div></div><div class="editorActions"><button class="btn secondary" data-open="${esc(e.id)}" type="button">查看</button>${isAdmin&&e.id!==HIST_ID?`<button class="btn danger" data-delete-event="${esc(e.id)}" type="button">删除</button>`:''}</div></div>`).join(''):'<div class="empty">还没有历史比赛</div>';
+  $('historyContent').querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{state.activeId=b.dataset.open;save();nav('live')}));
+  $('historyContent').querySelectorAll('[data-delete-event]').forEach(b=>b.addEventListener('click',()=>deleteEventById(b.dataset.deleteEvent)));
+}
 function render(){document.querySelectorAll("[data-admin-only]").forEach(el=>{el.hidden=!isAdmin;el.style.display=isAdmin?"":"none"});stats();homeRank();homeNet();recentUI();playerUI();if($('live').classList.contains('active'))liveUI();if($('standings').classList.contains('active'))standingsUI();if($('ratings').classList.contains('active'))ratingUI();if($('history').classList.contains('active'))historyUI()};render();setOnlineStatus();
 const API='https://hmumltbmetqdrverzjim.supabase.co';
 const PUBLIC_KEY='sb_publishable_AqD0t-DOlADlrfEKM6nvSw_6vT44QgO';
